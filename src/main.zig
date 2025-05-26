@@ -2,6 +2,17 @@ const assert = @import("std").debug.assert;
 const rl = @import("raylib");
 const rg = @import("raygui");
 
+fn get_center(points: []const rl.Vector2) rl.Vector2 {
+    assert(points.len > 0);
+    var sum_x: f32 = 0;
+    var sum_y: f32 = 0;
+    for (points) |point| {
+        sum_x += point.x;
+        sum_y += point.y;
+    }
+    return .{ .x = sum_x / @as(f32, @floatFromInt(points.len)), .y = sum_y / @as(f32, @floatFromInt(points.len)) };
+}
+
 fn draw_shape(points: []const rl.Vector2, color: rl.Color) void {
     assert(points.len > 1);
     for (0..points.len) |i| {
@@ -24,13 +35,8 @@ pub fn main() anyerror!void {
     //--------------------------------------------------------------------------------------
 
     var show_message_box = false;
-    const shape_1 = [_]rl.Vector2{
-        rl.Vector2{ .x = 0.0, .y = 0.0 },
-        rl.Vector2{ .x = 100.0, .y = 0.0 },
-        rl.Vector2{ .x = 100.0, .y = 100.0 },
-    };
 
-    const shape_2 = [_]rl.Vector2{
+    const shape_1 = [_]rl.Vector2{
         rl.Vector2{ .x = 100.0, .y = 100.0 },
         rl.Vector2{ .x = 200.0, .y = 100.0 },
         rl.Vector2{ .x = 200.0, .y = 200.0 },
@@ -56,17 +62,18 @@ pub fn main() anyerror!void {
 
         const mouse_pos = rl.getMousePosition();
         const shape_following_mouse = blk: {
+            const center = get_center(&shape_1);
             var result: [shape_1.len]rl.Vector2 = undefined;
             for (shape_1, 0..) |vec, i| {
                 result[i] = rl.Vector2{
-                    .x = vec.x + mouse_pos.x,
-                    .y = vec.y + mouse_pos.y,
+                    .x = vec.x + mouse_pos.x - center.x,
+                    .y = vec.y + mouse_pos.y - center.y,
                 };
             }
             break :blk result;
         };
 
-        draw_shape(&shape_2, .light_gray);
+        draw_shape(&shape_1, .light_gray);
         draw_shape(&shape_following_mouse, .red);
 
         if (rg.button(.init(24, 24, 120, 30), "#191#Show Message"))
