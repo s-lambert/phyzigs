@@ -22,6 +22,13 @@ fn draw_shape(points: []const rl.Vector2, color: rl.Color) void {
     }
 }
 
+fn shape_collision(shape_1: []const rl.Vector2, shape_2: []const rl.Vector2) bool {
+    const center_1 = get_center(shape_1);
+    const center_2 = get_center(shape_2);
+
+    return @abs(center_1.x - center_2.x) < 100;
+}
+
 pub fn main() anyerror!void {
     // Initialization
     //--------------------------------------------------------------------------------------
@@ -38,8 +45,10 @@ pub fn main() anyerror!void {
 
     const shape_1 = [_]rl.Vector2{
         rl.Vector2{ .x = 100.0, .y = 100.0 },
-        rl.Vector2{ .x = 200.0, .y = 100.0 },
-        rl.Vector2{ .x = 200.0, .y = 200.0 },
+        rl.Vector2{ .x = 200.0, .y = 110.0 },
+        rl.Vector2{ .x = 220.0, .y = 200.0 },
+        rl.Vector2{ .x = 100.0, .y = 250.0 },
+        rl.Vector2{ .x = 70.0, .y = 160.0 },
     };
 
     // Main game loop
@@ -75,6 +84,13 @@ pub fn main() anyerror!void {
 
         draw_shape(&shape_1, .light_gray);
         draw_shape(&shape_following_mouse, .red);
+
+        const do_shapes_collide = shape_collision(&shape_1, &shape_following_mouse);
+        if (do_shapes_collide) {
+            rl.drawText("O - collision", 350, 400, 20, .green);
+        } else {
+            rl.drawText("X - No collision", 330, 400, 20, .red);
+        }
 
         if (rg.button(.init(24, 24, 120, 30), "#191#Show Message"))
             show_message_box = true;
