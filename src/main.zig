@@ -1,3 +1,4 @@
+const std = @import("std");
 const assert = @import("std").debug.assert;
 const rl = @import("raylib");
 const rg = @import("raygui");
@@ -22,14 +23,100 @@ fn draw_shape(points: []const rl.Vector2, color: rl.Color) void {
     }
 }
 
-fn shape_collision(shape_1: []const rl.Vector2, shape_2: []const rl.Vector2) bool {
+fn shape_collision(allocator: std.mem.Allocator, shape_1: []const rl.Vector2, shape_2: []const rl.Vector2) !bool {
     const center_1 = get_center(shape_1);
     const center_2 = get_center(shape_2);
 
-    return @abs(center_1.x - center_2.x) < 100;
+    const dir = center_1.subtract(center_2).normalize();
+    var simplex: std.ArrayListUnmanaged(rl.Vector2) = .empty;
+    defer simplex.deinit(allocator);
+    const first_point = support(shape_1, shape_2, dir);
+    try simplex.append(allocator, first_point);
+    var next_dir = first_point.negate();
+    while (true) {
+        const next_point = support(shape_1, shape_2, next_dir);
+        if (next_point.normalize().dotProduct(next_dir.normalize()) < 0) {
+            return false;
+        }
+        try simplex.append(allocator, next_point);
+        if (handle_simplex(&simplex, &next_dir)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+fn handle_simplex(simplex: *std.ArrayListUnmanaged(rl.Vector2), dir: *rl.Vector2) bool {
+    if (simplex.items.len == 2) {
+        return line_case(simplex, dir);
+    }
+    return triangle_case(simplex, dir);
+}
+
+fn triple_product(A: rl.Vector2, B: rl.Vector2, C: rl.Vector2) rl.Vector2 {
+    const A3 = rl.Vector3.init(A.x, A.y, 0.0);
+    const B3 = rl.Vector3.init(B.x, B.y, 0.0);
+    const C3 = rl.Vector3.init(C.x, C.y, 0.0);
+    const result = A3.crossProduct(B3).crossProduct(C3);
+    return rl.Vector2.init(result.x, result.y);
+}
+
+fn line_case(simplex: *std.ArrayListUnmanaged(rl.Vector2), dir: *rl.Vector2) bool {
+    assert(simplex.items.len == 2);
+    const A = simplex.items[0];
+    const B = simplex.items[1];
+    const AB = B.subtract(A);
+    const AO = A.negate();
+    const AB_perp = triple_product(AB, AO, AB);
+    dir.* = AB_perp;
+    return false;
+}
+
+fn triangle_case(simplex: *std.ArrayListUnmanaged(rl.Vector2), dir: *rl.Vector2) bool {
+    assert(simplex.items.len == 3);
+    const A = simplex.items[0];
+    const B = simplex.items[1];
+    const C = simplex.items[2];
+    const AB = B.subtract(A);
+    const AC = C.subtract(A);
+    const AO = A.negate();
+    const AB_perp = triple_product(AC, AB, AB);
+    const AC_perp = triple_product(AB, AC, AC);
+    if (AB_perp.dotProduct(AO) > 0) {
+        _ = simplex.pop();
+        dir.* = AB_perp;
+        return false;
+    }
+    if (AC_perp.dotProduct(AO) > 0) {
+        _ = simplex.orderedRemove(1);
+        dir.* = AC_perp;
+        return false;
+    }
+    return true;
+}
+
+fn support(shape_1: []const rl.Vector2, shape_2: []const rl.Vector2, dir: rl.Vector2) rl.Vector2 {
+    return furthest_point(shape_1, dir).subtract(furthest_point(shape_2, dir.negate()));
+}
+
+fn furthest_point(shape: []const rl.Vector2, direction: rl.Vector2) rl.Vector2 {
+    var min_point: rl.Vector2 = undefined;
+    var min = std.math.inf(f32);
+    for (shape) |point| {
+        const new_min = point.dotProduct(direction);
+        if (new_min < min) {
+            min = new_min;
+            min_point = point;
+        }
+    }
+    return min_point;
 }
 
 pub fn main() anyerror!void {
+    var debug_allocator = std.heap.DebugAllocator(.{}).init;
+    const allocator = debug_allocator.allocator();
+
     // Initialization
     //--------------------------------------------------------------------------------------
     const screenWidth = 800;
@@ -85,7 +172,7 @@ pub fn main() anyerror!void {
         draw_shape(&shape_1, .light_gray);
         draw_shape(&shape_following_mouse, .red);
 
-        const do_shapes_collide = shape_collision(&shape_1, &shape_following_mouse);
+        const do_shapes_collide = try shape_collision(allocator, &shape_1, &shape_following_mouse);
         if (do_shapes_collide) {
             rl.drawText("O - collision", 350, 400, 20, .green);
         } else {
