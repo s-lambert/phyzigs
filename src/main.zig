@@ -65,7 +65,7 @@ fn shape_collision(shape_1: []const rl.Vector2, shape_2: []const rl.Vector2) !bo
     const dir = center_1.subtract(center_2).normalize();
     const first_point = support(shape_1, shape_2, dir);
     var simplex: Simplex = .init(first_point);
-    var next_dir = first_point.negate();
+    var next_dir = first_point.negate().normalize();
     while (true) {
         const next_point = support(shape_1, shape_2, next_dir);
         if (next_point.dotProduct(next_dir) < 0) {
@@ -92,6 +92,10 @@ fn triple_product(A: rl.Vector2, B: rl.Vector2, C: rl.Vector2) rl.Vector2 {
     const B3 = rl.Vector3.init(B.x, B.y, 0.0);
     const C3 = rl.Vector3.init(C.x, C.y, 0.0);
     const result = A3.crossProduct(B3).crossProduct(C3);
+    if (result.length() < 1e-6) {
+        // Handle degenerate case - use perpendicular to AB
+        return rl.Vector2.init(-result.y, result.x);
+    }
     return rl.Vector2.init(result.x, result.y);
 }
 
@@ -102,7 +106,7 @@ fn line_case(simplex: *Simplex, dir: *rl.Vector2) bool {
     const AB = B.subtract(A);
     const AO = A.negate();
     const AB_perp = triple_product(AB, AO, AB);
-    dir.* = AB_perp;
+    dir.* = AB_perp.normalize();
     return false;
 }
 
@@ -118,12 +122,12 @@ fn triangle_case(simplex: *Simplex, dir: *rl.Vector2) bool {
     const AC_perp = triple_product(AB, AC, AC);
     if (AB_perp.dotProduct(AO) > 0) {
         simplex.remove_C();
-        dir.* = AB_perp;
+        dir.* = AB_perp.normalize();
         return false;
     }
     if (AC_perp.dotProduct(AO) > 0) {
         simplex.remove_B();
-        dir.* = AC_perp;
+        dir.* = AC_perp.normalize();
         return false;
     }
     return true;
@@ -134,16 +138,16 @@ fn support(shape_1: []const rl.Vector2, shape_2: []const rl.Vector2, dir: rl.Vec
 }
 
 fn furthest_point(shape: []const rl.Vector2, direction: rl.Vector2) rl.Vector2 {
-    var min_point: rl.Vector2 = undefined;
-    var min = std.math.inf(f32);
+    var max_point: rl.Vector2 = undefined;
+    var max = -std.math.inf(f32);
     for (shape) |point| {
-        const new_min = point.dotProduct(direction);
-        if (new_min < min) {
-            min = new_min;
-            min_point = point;
+        const new_max = point.dotProduct(direction);
+        if (new_max > max) {
+            max = new_max;
+            max_point = point;
         }
     }
-    return min_point;
+    return max_point;
 }
 
 pub fn main() anyerror!void {
