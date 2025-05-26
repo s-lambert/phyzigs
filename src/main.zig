@@ -1,46 +1,49 @@
-//! By convention, main.zig is where your main function lives in the case that
-//! you are building an executable. If you are making a library, the convention
-//! is to delete this file and start with root.zig instead.
+const rl = @import("raylib");
+const rg = @import("raygui");
 
-pub fn main() !void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
+pub fn main() anyerror!void {
+    // Initialization
+    //--------------------------------------------------------------------------------------
+    const screenWidth = 800;
+    const screenHeight = 450;
 
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
+    rl.initWindow(screenWidth, screenHeight, "raylib-zig [core] example - basic window");
+    defer rl.closeWindow(); // Close window and OpenGL context
 
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
+    rl.setTargetFPS(60); // Set our game to run at 60 frames-per-second
+    //--------------------------------------------------------------------------------------
 
-    try bw.flush(); // Don't forget to flush!
-}
+    var show_message_box = false;
+    // Main game loop
+    while (!rl.windowShouldClose()) { // Detect window close button or ESC key
 
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // Try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
-}
+        // Update
+        //----------------------------------------------------------------------------------
+        // TODO: Update your variables here
+        //----------------------------------------------------------------------------------
 
-test "use other module" {
-    try std.testing.expectEqual(@as(i32, 150), lib.add(100, 50));
-}
+        // Draw
+        //----------------------------------------------------------------------------------
+        rl.beginDrawing();
+        defer rl.endDrawing();
 
-test "fuzz example" {
-    const Context = struct {
-        fn testOne(context: @This(), input: []const u8) anyerror!void {
-            _ = context;
-            // Try passing `--fuzz` to `zig build test` and see if it manages to fail this test case!
-            try std.testing.expect(!std.mem.eql(u8, "canyoufindme", input));
+        rl.clearBackground(.white);
+
+        rl.drawText("Congrats! You created your first window!", 190, 200, 20, .light_gray);
+        //----------------------------------------------------------------------------------
+
+        if (rg.button(.init(24, 24, 120, 30), "#191#Show Message"))
+            show_message_box = true;
+
+        if (show_message_box) {
+            const result = rg.messageBox(
+                .init(85, 70, 250, 100),
+                "#191#Message Box",
+                "Hi! This is a message",
+                "Nice;Cool",
+            );
+
+            if (result >= 0) show_message_box = false;
         }
-    };
-    try std.testing.fuzz(Context{}, Context.testOne, .{});
+    }
 }
-
-const std = @import("std");
-
-/// This imports the separate module containing `root.zig`. Take a look in `build.zig` for details.
-const lib = @import("phyzigs_lib");
